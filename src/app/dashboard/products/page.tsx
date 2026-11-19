@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Eye, Loader2 } from "lucide-react"
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Eye, Loader2, Download } from "lucide-react"
+import { downloadProductsBundle } from "@/lib/export-products"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -30,6 +31,8 @@ export default function ProductsPage() {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState<{ done: number; total: number } | null>(null)
 
   // Load products on component mount
   useEffect(() => {
@@ -83,6 +86,25 @@ export default function ProductsPage() {
     }
   }
 
+  const handleBulkDownload = async () => {
+    try {
+      setExporting(true)
+      setExportProgress(null)
+      const { failedImages } = await downloadProductsBundle(products, (done, total) =>
+        setExportProgress({ done, total })
+      )
+      if (failedImages > 0) {
+        alert(`Download complete, but ${failedImages} image(s) could not be fetched.`)
+      }
+    } catch (error) {
+      console.error('Bulk download failed:', error)
+      alert('Failed to create the download. Please try again.')
+    } finally {
+      setExporting(false)
+      setExportProgress(null)
+    }
+  }
+
   // Helper functions to get data from the JSON structure
   const getProductImage = (product: Product): string => {
     return product.data?.images?.[0] || "/placeholder.svg?height=40&width=40"
@@ -125,12 +147,27 @@ export default function ProductsPage() {
           <h2 className="text-3xl font-bold tracking-tight">Products</h2>
           <p className="text-muted-foreground">Manage your product catalog and specifications</p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/products/add">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Product
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleBulkDownload} disabled={exporting || products.length === 0}>
+            {exporting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                {exportProgress ? `Images ${exportProgress.done}/${exportProgress.total}` : "Preparing..."}
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Download All
+              </>
+            )}
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard/products/add">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Product
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
